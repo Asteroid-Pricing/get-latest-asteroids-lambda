@@ -1,0 +1,26 @@
+{
+  "name": "get-latest-asteroids-lambda",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Asteroid-Pricing/get-latest-asteroids-lambda.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Asteroid-Pricing/get-latest-asteroids-lambda/issues"
+  },
+  "homepage": "https://github.com/Asteroid-Pricing/get-latest-asteroids-lambda#readme",
+  "devDependencies": {
+    "aws-sdk": "^2.610.0"
+  },
+  "dependencies": {
+    "lodash": "^4.17.15"
+  }
+}
