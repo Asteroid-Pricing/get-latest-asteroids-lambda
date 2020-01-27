@@ -72,6 +72,10 @@ const getFiveMegStream = uploadPartPartial => {
     let counter = 0
     let chunks = Buffer.from([])
     let cloneBuffer
+    const MAX_CONCURRENCY = 8
+    let currentUploads = 0
+    let lastBuffer
+    let lastCounter
     return new stream.Transform({
         readableObjectMode: true,
         writableObjectMode: true,
@@ -80,7 +84,7 @@ const getFiveMegStream = uploadPartPartial => {
                 size = chunk.length
             }
             if(chunk.length !== size) {
-                log("lastOne incoming")
+                log("lastOne incoming, size:", chunk.length)
                 lastOne = true
             }
             chunks = Buffer.concat([chunks, chunk])
@@ -90,27 +94,60 @@ const getFiveMegStream = uploadPartPartial => {
             }
             
             counter++
+            currentUploads++
             cloneBuffer = chunks.slice(0, chunks.length)
-            uploadPartPartial(counter)(cloneBuffer)(lastOne)
+            if(lastOne) {
+                currentUploads--
+                lastCounter = counter
+                lastBuffer = chunks.slice(0, chunks.length)
+                return false
+            }
+            log("uploading counter:", counter, "cloneBuffer length:", cloneBuffer.length)
+            uploadPartPartial(counter)(cloneBuffer)(false)
             .then(
                 ({ part, isLast }) => {
+                    currentUploads--
+                    log("isLast:", isLast, "part:", part, "currentUploads:", currentUploads, "lastOne:", lastOne)
+                    
                     if(isLast === false) {
-                        // this.push(JSON.stringify(part))
-                        callback(undefined, JSON.stringify(part))
+                        this.push(JSON.stringify(part))
+                    }
+
+                    if(lastOne === false) {
+                        callback()
                         return
                     }
-                    // this.push(JSON.stringify(set('isLast', true, part)))
-                    // this.push(null)
-                    callback(undefined, JSON.stringify(set('isLast', true, part)))
+                    
+                    if(currentUploads === 0) {
+                        log("uploading _last_ counter:", lastCounter, "cloneBuffer length:", lastBuffer.length)
+                        uploadPartPartial(lastCounter)(lastBuffer)(true)
+                        .then(
+                            lastPart => {
+                                log("lastPart:", lastPart)
+                                this.push(JSON.stringify(set('isLast', true, lastPart.part)))
+                                callback()
+                            }
+
+                        )
+                    }
                 }
             )
             .catch(
                 error => {
+                    currentUploads--
                     this.emit('error', error)
                 }
             )
             chunks = Buffer.from([])
-            return false
+            if(currentUploads < MAX_CONCURRENCY) {
+                log("Room fore more uploads, returning true.")
+                callback()
+                return true
+            } else {
+                log("No more room for uploads, returning false.")
+                return false
+            }
+            
         }
     })
 }
@@ -123,7 +160,7 @@ const getPartsAssemblerStream = s3 => bucket => key => uploadID => {
         write(partJSON, encoding, callback) {     
             const part = JSON.parse(partJSON)
             
-            log("part:", part)                                                                                                                                                                                                 
+            log("parsed part:", part)                                                                                                                                                                                                 
             if(getOr(false, 'isLast', part) === false) {
                 parts.push(part)
                 callback()
@@ -132,7 +169,7 @@ const getPartsAssemblerStream = s3 => bucket => key => uploadID => {
             // log("Part:", part)
             log("Done, uploading all...")
             parts.push(pick(['ETag', 'PartNumber'], part))
-            log(parts)
+            log("parts:", parts)
             s3.completeMultipartUpload({
                 Bucket: bucket,
                 Key: key,
