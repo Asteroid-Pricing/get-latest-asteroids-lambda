@@ -1,47 +1,15 @@
 const log = console.log
-const https = require('https')
 const AWS = require('aws-sdk')
 const stream = require('stream')
 const { pipeline } = stream
 const fs = require('fs')
 const { set, get, getOr, sortBy, pick } = require('lodash/fp')
 
+const downloadLatestAsteroids = require('./download')
+
 const FIVE_MEGS = 5 * 1024 * 1024
 
-const downloadLatestAsteroids = () =>
-    new Promise(
-        (success, failure) => {
-            const req = https.request({
-                    hostname: 'ssd.jpl.nasa.gov',
-                    port: 443,
-                    path: '/sbdb_query.cgi',
-                    method: 'POST',
-                    headers: {
-                        'origin': 'https://ssd.jpl.nasa.gov',
-                        'upgrade-insecure-requests': 1,
-                        'dnt': 1,
-                        'content-type': 'multipart/form-data; boundary=----WebKitFormBoundaryI5CMg9fifgJnfvc6',
-                        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36',
-                        'X-DevTools-Emulate-Network-Conditions-Client-Id': 'F64DB139B75061A6BE276315A7C5AC1D',
-                        'referrer': 'https://ssd.jpl.nasa.gov/sbdb_query.cgi'
-                    },
-                },
-                response => {
-                    log("response.statusCode:", response.statusCode, response.statusMessage)
-                    response.pipe(fs.createWriteStream('db.csv'))
-                    success(response)
-                }
-            )
-            req.on('error', error => {
-                log('error:', error)
-                failure(error)
-            })
-            req.write(`------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="obj_group"\r\n\r\nall\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="obj_kind"\r\n\r\nall\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="obj_numbered"\r\n\r\nall\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="OBJ_field"\r\n\r\n0\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="OBJ_op"\r\n\r\n0\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="OBJ_value"\r\n\r\n\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="ORB_field"\r\n\r\n0\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="ORB_op"\r\n\r\n0\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="ORB_value"\r\n\r\n\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="c_fields"\r\n\r\nAaAbAcAdAeAfAgAhAiAjAkAlAmAnAoApAqArAsAtAuAvAwAxAyAzBaBbBcBdBeBfBgBhBiBjBkBlBmBnBoBpBqBrBsBtBuBvBwBxByBzCaCbCcCdCeCfCgChCiCjCkClCmCnCoCpCqCrCsCtCuCvCw\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="table_format"\r\n\r\nCSV\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="max_rows"\r\n\r\n10\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="format_option"\r\n\r\ncomp\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name="query"\r\n\r\nGenerate Table\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nformat_option\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nfield_list\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nobj_kind\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nobj_group\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nobj_numbered\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nast_orbit_class\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\ntable_format\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nOBJ_field_set\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\nORB_field_set\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\npreset_field_set\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6\r\nContent-Disposition: form-data; name=".cgifields"\r\n\r\ncom_orbit_class\r\n------WebKitFormBoundaryI5CMg9fifgJnfvc6--\r\n`)
-            req.end()
-        }
-    )
-
-const uploadPart = s3 => bucket => key => uploadID => counter => chunks => isLast =>
+const uploadPart = s3 => bucket => key => uploadID => counter => chunks => isLastPart =>
     s3.uploadPart({
         Bucket: bucket,
         Key: key,
@@ -51,84 +19,76 @@ const uploadPart = s3 => bucket => key => uploadID => counter => chunks => isLas
     })
     .promise()
     .then(
-        result => {
-            log("upload result:", result)
-            return result
-        }
-    )
-    .then(
         set('PartNumber', counter)
     )
     .then(
         result =>
             ({
                 part: result,
-                isLast
+                isLastPart
             })
     )
-const getFiveMegStream = uploadPartPartial => {
-    let size = -1
-    let lastOne = false
-    let counter = 0
+
+const LAST_CHONK = Buffer.from("copy pasta coding FTW")
+
+const getFiveMegChunkerStream = () => {
     let chunks = Buffer.from([])
-    let cloneBuffer
-    const MAX_CONCURRENCY = 8
-    let currentUploads = 0
-    let lastBuffer
-    let lastCounter
+    let smallestSize = FIVE_MEGS
+    let largestSize = -1
+    let lastSize = 0
+    let clone
     return new stream.Transform({
         readableObjectMode: true,
         writableObjectMode: true,
         transform(chunk, encoding, callback) {
-            if(size === -1) {
-                size = chunk.length
-            }
-            if(chunk.length !== size) {
-                log("lastOne incoming, size:", chunk.length)
-                lastOne = true
-            }
             chunks = Buffer.concat([chunks, chunk])
-            if(chunks.length < FIVE_MEGS && lastOne === false) {
+            smallestSize = Math.min(smallestSize, chunks.length)
+            largestSize = Math.max(largestSize, chunks.length)
+            lastSize = chunks.length
+            if(chunks.length < FIVE_MEGS) {
                 callback()
                 return true
             }
-            
+            clone = chunks.slice(0, chunks.length)
+            chunks = Buffer.from([])
+            callback(undefined, { chunk: clone, isLast: false })
+            return true
+        },
+        flush(callback) {
+            callback(undefined, { chunk: clone, isLast: true })
+        }
+    })
+
+}
+
+const getUploadPartStream = uploadPartPartial => {
+    log("getUploadPartStream")
+    let chunks = Buffer.from([])
+    let counter = 0
+    const MAX_CONCURRENCY = 8
+    let currentUploads = 0
+    let cloneBuffer
+    return new stream.Transform({
+        readableObjectMode: true,
+        writableObjectMode: true,
+        transform({ chunk, isLast }, encoding, callback) {
+            chunks = Buffer.concat([chunks, chunk])
             counter++
             currentUploads++
             cloneBuffer = chunks.slice(0, chunks.length)
-            if(lastOne) {
-                currentUploads--
-                lastCounter = counter
-                lastBuffer = chunks.slice(0, chunks.length)
-                return false
-            }
-            log("uploading counter:", counter, "cloneBuffer length:", cloneBuffer.length)
-            uploadPartPartial(counter)(cloneBuffer)(false)
+            chunks = Buffer.from([])
+        
+            log("counter:", counter, "currentUploads:", currentUploads, "chunks.length:", chunks.length, "uploading counter:", counter)
+            uploadPartPartial(counter)(cloneBuffer)(isLast)
             .then(
-                ({ part, isLast }) => {
+                ({ part, isLastPart }) => {
                     currentUploads--
-                    log("isLast:", isLast, "part:", part, "currentUploads:", currentUploads, "lastOne:", lastOne)
+                    log("isLastPart:", isLastPart, "part:", part, "currentUploads:", currentUploads)
                     
-                    if(isLast === false) {
-                        this.push(JSON.stringify(part))
-                    }
-
-                    if(lastOne === false) {
-                        callback()
-                        return
-                    }
-                    
-                    if(currentUploads === 0) {
-                        log("uploading _last_ counter:", lastCounter, "cloneBuffer length:", lastBuffer.length)
-                        uploadPartPartial(lastCounter)(lastBuffer)(true)
-                        .then(
-                            lastPart => {
-                                log("lastPart:", lastPart)
-                                this.push(JSON.stringify(set('isLast', true, lastPart.part)))
-                                callback()
-                            }
-
-                        )
+                    if(isLastPart === false) {
+                        callback(undefined, JSON.stringify(part))
+                    } else {
+                        callback(undefined, JSON.stringify(set('isLast', true, part)))
                     }
                 }
             )
@@ -138,10 +98,8 @@ const getFiveMegStream = uploadPartPartial => {
                     this.emit('error', error)
                 }
             )
-            chunks = Buffer.from([])
-            if(currentUploads < MAX_CONCURRENCY) {
+            if(currentUploads < MAX_CONCURRENCY && isLast === false) {
                 log("Room fore more uploads, returning true.")
-                callback()
                 return true
             } else {
                 log("No more room for uploads, returning false.")
@@ -153,6 +111,7 @@ const getFiveMegStream = uploadPartPartial => {
 }
 
 const getPartsAssemblerStream = s3 => bucket => key => uploadID => {
+    log("getPartsAssemblerStream")
     const parts = []
     return new stream.Writable({
         writableObjectMode: true,
@@ -202,8 +161,10 @@ const downloadLatestAsteroidsAndUploadToS3 = async (event) =>
             const { bucket, asteroidsLatestFilename } = event
             const s3 = new AWS.S3()
 
-            // const responseStream = await downloadLatestAsteroids()
-            const responseStream = fs.createReadStream('latest_fulldb.csv')
+            log("Downloading latest asteroids file...")
+            const responseStream = await downloadLatestAsteroids()
+            // const responseStream = fs.createReadStream('latest_fulldb.csv')
+            log("Creating multipart upload...")
             const { UploadId } = await s3.createMultipartUpload({
                 Bucket: bucket,
                 Key: asteroidsLatestFilename
@@ -215,9 +176,11 @@ const downloadLatestAsteroidsAndUploadToS3 = async (event) =>
             let chunks = Buffer.from([])
             const uploadPartPartial = uploadPart(s3)(bucket)(asteroidsLatestFilename)(UploadId)
             
+            log("Setting up pipeline...")
             pipeline(
                 responseStream,
-                getFiveMegStream(uploadPartPartial),
+                getFiveMegChunkerStream(),
+                getUploadPartStream(uploadPartPartial),
                 getPartsAssemblerStream(s3)(bucket)(asteroidsLatestFilename)(UploadId),
                 (err, thing) => {
                   if (err) {
@@ -247,17 +210,23 @@ const downloadLatestAsteroidsAndUploadToS3 = async (event) =>
 
 const handler = async (event) => {
     log("event:", event)
-
-    const result = await downloadLatestAsteroidsAndUploadToS3(event)
-    log("result:", result)
+    try {
+        const result = await downloadLatestAsteroidsAndUploadToS3(event)
+        log("result:", result)
+    } catch(error) {
+        log("overall error:", error)
+    }
     return event
 }
 
-module.exports = handler
+exports.handler = handler
 
 if(require.main === module) {
-    handler({bucket: 'asteroid-files', asteroidsLatestFilename: 'latest-asteroids.csv'})
-    .then(log)
+    // handler({bucket: 'asteroid-files', asteroidsLatestFilename: 'latest-asteroids.csv'})
+    // .then(log)
+    // .catch(log)
+    downloadLatestAsteroids()
+    .then(result => log('result:', result))
     .catch(log)
 }
 

@@ -4,7 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "iprod": "rm -rf node_modules && npm i --production",
+    "clean": "rm deploy.zip | true",
+    "zip": "zip -r deploy.zip index.js download.js node_modules",
+    "build": "npm run clean && npm run iprod && npm run zip",
+    "deploy": "sh scripts/update-lambda.sh",
+    "bd": "npm run build && npm run deploy"
   },
   "repository": {
     "type": "git",
